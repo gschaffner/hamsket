@@ -1,0 +1,73 @@
+name: Build and release nightly
+on:
+  # schedule:
+  #   - cron: '0 0 * * *'  # daily at 00:00 UTC
+  push: # TODO
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    env:
+      SENCHA_CMD_VER: '7.2.0.84'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Restore cached Sencha Cmd installation
+      id: cache-senchacmd
+      uses: actions/cache@v2
+      with:
+        path: ~/senchacmd
+        key: ${{ runner.os }}-senchacmd-${{ env.SENCHA_CMD_VER }}
+
+    - name: Install Sencha Cmd
+      if: steps.cache-senchacmd.outputs.cache-hit != 'true'
+      run: |
+        # inspired by PKGBUILD of AUR sencha-cmd
+        wget -nv "http://cdn.sencha.com/cmd/${SENCHA_CMD_VER}/no-jre/SenchaCmd-${SENCHA_CMD_VER}-linux-amd64.sh.zip"
+        unzip "SenchaCmd-${SENCHA_CMD_VER}-linux-amd64.sh.zip"
+        ./SenchaCmd-${SENCHA_CMD_VER}-linux-amd64.sh -q \
+            -Dall=true \
+            -V'addToPath$Integer'=1 \
+            -dir "$HOME/senchacmd"
+        # -q                        quiet
+        # -Dall=true                install all components
+        # -V'addToPath$Integer'=1   don't modify .bashrc
+        # -dir "$HOME/senchacmd"    custom installation path
+
+    - name: Restore cached node packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Build
+      run: |
+        export PATH="$HOME/senchacmd:$PATH"
+        npm install
+        npm run setup
+
+    - name: TODO
+      run: |
+        ls -Alh dist
+
+    # - name: Create release
+    #   id: create-release
+    #   uses: actions/create-release@v1
+    #   with:
+    #     tag_name: nightly
+    #     release_name: nightly
+    #     prerelease: true
+    #     draft: # TODO
+    #     body_path: # TODO
+
+    # - name: Upload binary
+    #   uses: actions/upload-release-asset@v1
+    #   with:
+    #     upload_url: ${{ steps.create-release.outputs.upload_url }}
+    #     asset_path: # TODO
+    #     asset_name: # TODO
+    #     asset_content_type: # TODO
